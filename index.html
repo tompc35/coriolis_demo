@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Coriolis</title>
+  <style>
+    .customButton {  /* style a link as a push-button */
+      display: inline-block;
+      width: 60px;
+      height: 24px;
+      line-height: 24px;
+      font-size: 15px;
+      font-family: sans-serif;
+      text-align: center;
+      color: black;
+      background: -webkit-linear-gradient(white,#eeeeee,#eeeeee,#e0e0e0);
+      background: linear-gradient(white,#eeeeee,#eeeeee,#e0e0e0);
+      text-decoration: none;
+      border: 1px solid gray;
+      border-radius: 5px;
+      -webkit-user-select: none;
+      -moz-user-select: -moz-none;
+      -ms-user-select: none;
+      user-select: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+    }
+    .customButton:active {
+      background: -webkit-linear-gradient(#909090,#808080,#808080,#707070);
+      background: linear-gradient(#909090,#808080,#808080,#707070);
+  }
+  input[type="range"] {
+    width: 140px;
+    padding: 0px;
+  }
+  input[type="range"]::-ms-tooltip {
+    display: none;       /* hide readout in IE */
+  }
+  input[type="range"]::-ms-track {
+    color: transparent;  /* hide tick marks in IE */
+  }
+  input {
+    -webkit-user-select: none;
+    -moz-user-select: -moz-none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  </style>
+
+</head>
+
+<body style="font-family:sans-serif; font-size:15px; width:600px;
+    margin-left:auto; margin-right:auto;
+    background-color:#e0e0e0;">
+
+  <h1 style="font-size:24px; text-align:center;">
+    Coriolis force demo
+  </h1>
+
+  <div style="width:800px; margin-left:auto; margin-right:auto; position:relative;">
+  <canvas id="trailCanvas" width="800" height="400" style="position:absolute;">
+    Canvas not supported; please update your browser.
+  </canvas>
+  <canvas id="theCanvas" width="800" height="400" style="position:relative;">
+    Canvas not supported; please update your browser.
+  </canvas>
+  </div>
+
+  <a class="customButton" href="javascript:void(0)"
+    onclick="fireProjectile();" ontouchstart="">Start</a>
+
+  <a class="customButton" href="javascript:void(0)"
+      onclick="stopProjectile();" ontouchstart="">Stop</a>
+
+  <a class="customButton" href="javascript:void(0)"
+      onclick="clearProjectile();" ontouchstart="">Clear</a>
+
+  &nbsp;
+
+  <div>
+    <input type="range" id="viewSlider" min="-90" max="90" step="1" value="15",
+            oninput="showView();" onchange="showView();">
+    View = <span id="viewReadout" style="display:inline-block;
+                      text-align:right;">15</span>
+  </div>
+  <div>
+    <input type="range" id="latSlider" min="-80" max="80" step="1" value="60",
+            oninput="showLat();" onchange="showLat();">
+    Latitude = <span id="latReadout" style="display:inline-block;
+                      text-align:right;">60</span>
+  </div>
+  <div>
+    <input type="range" id="rotSlider" min="-20" max="20" step="1" value="10",
+            oninput="showRot();" onchange="showRot();">
+    Rotation = <span id="rotReadout" style="display:inline-block;
+                      text-align:right;">10</span>
+  </div>
+  <div>
+    <input type="range" id="uSlider" min="-5" max="5" step="0.1" value="0.0",
+            oninput="showU();" onchange="showU();">
+    U = <span id="uReadout" style="display:inline-block;
+                      text-align:right;">0.0</span>
+  </div>
+  <div>
+    <input type="range" id="vSlider" min="-5" max="5" step="0.1" value="3.0",
+            oninput="showV();" onchange="showV();">
+    V = <span id="vReadout" style="display:inline-block;
+                      text-align:right;">3.0</span>
+  </div>
+
+ <input type="button" id="bulgeButton" value="ON "
+      onclick="javascript:toggleBulge(this);">
+  Equatorial bulge
+
+  <p>Adapted from BASIC code in Stommel and Moore, An Introduction to the Coriolis Force,
+    Columbia University Press (1989)</p>
+
+  <script>
+    var theCanvas = document.getElementById("theCanvas");
+    var theContext = theCanvas.getContext("2d");
+
+    var trailCanvas = document.getElementById("trailCanvas");
+    var trailContext = trailCanvas.getContext("2d");
+
+    var speedSlider = document.getElementById("speedSlider");
+    var speedReadout = document.getElementById("speedReadout");
+
+    var PI = Math.PI
+
+    //screen width and height
+    var sw = 800.0;         // screen width (pixels)
+    var sh = sw*(4.0/8.0);  // screen height (pixels)
+
+    // Coordinates for sphere centers
+    var fcentx = (3.0/16.0)*sw;
+    var fcenty = (9.0/20.0)*sh;
+    var rcentx = (9.0/16.0)*sw;
+    var rcenty = fcenty;
+
+    var status_value = 0;
+    var timer;
+
+    //plotting parameters
+    var fact = 60.0*(sh/180.0);  // Earth sphere radius -- 60 ???
+    var dt = 5.0e-6;
+    var step = 200;
+
+    // Initialize variables for plotting trajectories
+    var rho = new Array(4);
+    var x = new Array(4);
+    var y = new Array(4);
+    var z = new Array(4);
+    var k = new Array(4);
+    var xi = new Array(4);
+    var zi = new Array(4);
+    var lodd = new Array(4);
+    var ladd = new Array(4);
+    var col = new Array(4)
+
+    // plotting colors
+    // color g1 = color(24, 92, 201);
+    // color g0 = color(24, 162, 201);
+    // color r1 = color(196, 2, 22);
+    // color r0 = color(196, 72, 22);
+    // color[] c = {g0,r0,g1,r1};
+
+    var radius = 0.5;
+    var radius2 = 3.5;
+
+    //user-specified parameters
+    var View = 60.0;
+    var u = 0.0;
+    var v = 3.0;
+    var lat = 60.0;              // Initial latitude
+    var w = 10.0;
+    var w2 = w*w;
+    var bulge_bool = 1;
+
+    var inc = View*PI/180.0;  // Angle of view
+    var inc2 = inc;
+    var inct = inc;
+
+    // Initial conditions
+    var la = [lat*PI/180.0,lat*PI/180.0,lat*PI/180.0,lat*PI/180.0];
+    var lo = [-PI/2.0,-PI/2.0,-PI/2.0,-PI/2.0];
+    var lad = [0.0, v, 0.0, v];
+    var lod = [0.0,u/Math.cos(la[0])+w,0.0,u/Math.cos(la[0])];
+    var t = 0.0;
+    var w2 = w*w;
+
+    // Initialize variables for correction at initial latitude
+    var lainit = la[1];
+    var lai = la[1];
+    var lodinit = lod[1];
+    var ladinit = lad[1];
+
+    // Calculate speed and initialize variables for speed correction
+    var speed = Math.sqrt(u*u + v*v);
+    var tspeed = speed;
+    var tu = u;
+    var tv = v;
+    var factspeed = 1.0;
+
+    main()
+
+    function main() {
+      if (status_value == 0) {
+        initializeValues();
+        drawEarth(inc);
+        drawParticle();
+      } else if (status_value == 1) {
+        drawEarth(inc);
+        calcTrajectory();
+        drawParticle();
+        drawTrail();
+      }
+      timer = window.setTimeout(main, 500/30);
+    }
+
+    function initializeValues() {
+      View = parseFloat(viewSlider.value);
+      lat = parseFloat(latSlider.value);
+      u = parseFloat(uSlider.value);
+      v = parseFloat(vSlider.value);
+      w = parseFloat(rotSlider.value);
+      t = 0.0;
+
+      inc = View*PI/180.0;
+      inc2 = View*PI/180.0;
+
+      // Initial conditions
+      la = [lat*PI/180.0,lat*PI/180.0,lat*PI/180.0,lat*PI/180.0];
+      lo = [-PI/2.0,-PI/2.0,-PI/2.0,-PI/2.0];
+      lad = [0.0, v, 0.0, v];
+      lod = [0.0,u/Math.cos(la[0])+w,0.0,u/Math.cos(la[0])];
+      w2 = w*w;
+
+      speed = Math.sqrt(u*u + v*v);
+      lad[1] = v;
+      lad[3] = v;
+      lod[1] = u/Math.cos(la[1])+w;
+      lod[3] = u/Math.cos(la[1]);
+
+      for (h = 0; h <= 3; h++) {
+        rho[h] = Math.cos(la[h]);
+        x[h] = rho[h]*Math.cos(lo[h]);
+        y[h] = rho[h]*Math.sin(lo[h])*Math.sin(inc2);
+        z[h] = y[h] + Math.sin(la[h])*Math.cos(inc2);
+        k[h] = -Math.sin(la[h])*Math.sin(inc2) + Math.cos(inc2)*Math.sin(lo[h]);
+      }
+    }
+
+    function calcTrajectory() {
+      // Calculate the acceleration, velocity and trajectory
+      for (j = 0; j <=step; j = j+1) {
+        // Prevent roundoff error from longitude and time values getting too big
+        if (Math.abs(lo[0]) > 2.0*PI) {
+          lo[0] = lo[0] - 2.0*PI*(lo[0]/Math.abs(lo[0]));
+        }
+        if (Math.abs(lo[1]) > 2.0*PI) {
+          lo[1] = lo[1] - 2.0*PI*(lo[1]/Math.abs(lo[1]));
+        }
+        if (Math.abs(w*t) > 2.0*PI) {
+          t = t - (2.0*PI/w)*(w/Math.abs(w));
+        }
+
+        // Calculate acceleration and velocity in fixed reference frame (See Section 7.4 in Stommel and Moore)
+        lodd[1] = 2.0*Math.tan(la[1])*lad[1]*lod[1];
+        ladd[1] = (Math.sin(la[1])*Math.cos(la[1]))*(w2-(lod[1]*lod[1]));
+        lod[1] = lod[1] + dt*lodd[1];
+        lad[1] = lad[1] + dt*ladd[1];
+        t = t + dt;
+
+        // Calculate longitude and latitude
+        la[1] = la[1] + dt*lad[1];
+        lo[1] = lo[1] + dt*lod[1];
+        lo[3] = lo[1] - w*t;
+        la[3] = la[1];
+        lo[0] = lo[0] + w*dt;
+        lo[2] = lo[0] - w*t;
+      }
+
+      // Convert latitude and longitude to x,z coordinates on a plane
+      for (i = 0; i <=3; i = i+1) {
+        rho[i] = Math.cos(la[i]);
+        x[i] = rho[i]*Math.cos(lo[i]);
+        y[i] = rho[i]*Math.sin(lo[i])*Math.sin(inc);
+        z[i] = y[i] + Math.sin(la[i])*Math.cos(inc);
+        k[i] = -Math.sin(la[i])*Math.sin(inc) + Math.cos(inc)*Math.sin(lo[i]);
+      }
+    }
+
+    // Draw instantaneous particle layer
+    function drawParticle() {
+      setParticleColor()
+
+      theContext.beginPath();
+      theContext.ellipse(fcentx + fact*x[0],fcenty - fact*z[0],radius2,radius2,0,0,2*PI);
+      theContext.fillStyle=col[0];
+      theContext.fill();
+      theContext.stroke();
+
+      theContext.beginPath();
+      theContext.ellipse(fcentx + fact*x[1],fcenty - fact*z[1],radius2,radius2,0,0,2*PI);
+      theContext.fillStyle=col[1];
+      theContext.fill();
+      theContext.stroke();
+
+      theContext.beginPath();
+      theContext.ellipse(rcentx + fact*x[2],rcenty - fact*z[2],radius2,radius2,0,0,2*PI);
+      theContext.fillStyle=col[2];
+      theContext.fill();
+      theContext.stroke();
+
+      theContext.beginPath();
+      theContext.ellipse(rcentx + fact*x[3],rcenty - fact*z[3],radius2,radius2,0,0,2*PI);
+      theContext.fillStyle=col[3];
+      theContext.fill();
+      theContext.stroke();
+
+    }
+
+    function drawTrail() {
+      lw = 1.5;
+
+      trailContext.fillStyle = col[0];
+      trailContext.fillRect(fcentx + fact*x[0]-lw/2,fcenty - fact*z[0]-lw/2, lw, lw);
+
+      trailContext.fillStyle = col[1];
+      trailContext.fillRect(fcentx + fact*x[1]-lw/2,fcenty - fact*z[1]-lw/2, lw, lw);
+
+      trailContext.fillStyle = col[2];
+      trailContext.fillRect(rcentx + fact*x[2]-lw/2,rcenty - fact*z[2]-lw/2, lw, lw);
+
+      trailContext.fillStyle = col[3];
+      trailContext.fillRect(rcentx + fact*x[3]-lw/2,rcenty - fact*z[3]-lw/2, lw, lw);
+    }
+
+    function setParticleColor() {
+      // Set color
+      if (k[0] >= 0) {
+        col[0] = "#FFA500"; // orange
+      } else {
+        col[0] = "#FF0000"; // red
+      }
+      if (k[1] >= 0) {
+        col[1] = "#00FFFF"; // cyan
+      } else {
+        col[1] = "#0000FF"; // blue
+      }
+      if (k[2] >= 0) {
+        col[2] = "#FFA500"; // orange
+      } else {
+        col[2] = "#FF0000"; // red
+      }
+      if (k[3] >= 0) {
+        col[3] = "#00FFFF"; // cyan
+      } else {
+        col[3] = "#0000FF"; // blue
+      }
+    }
+
+    function drawEarth(incd) {
+
+      var c9 = fact*Math.sin(PI/6.0)*Math.cos(incd);
+      var k9 = fact*Math.cos(PI/6.0);
+      var c8 = fact*Math.sin(PI/3.0)*Math.cos(incd);
+      var k8 = fact*Math.cos(PI/3.0);
+
+      theContext.clearRect(0, 0, theCanvas.width, theCanvas.height);
+
+      // Left
+      theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty,fact,fact,0,0,2*PI);     // Circle (fixed)
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty,fact,Math.abs(fact*Math.sin(incd)),0,0,2*PI); // Equatorial ellipse
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty-c9,k9,Math.abs(k9*Math.sin(incd)),0,0,2*PI); // Mid-latitude ellipses
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty+c9,k9,Math.abs(k9*Math.sin(incd)),0,0,2*PI);
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty-c8,k8,Math.abs(k8*Math.sin(incd)),0,0,2*PI); // High-latitude ellipses
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(fcentx,fcenty+c8,k8,Math.abs(k8*Math.sin(incd)),0,0,2*PI);
+      theContext.stroke();
+
+      // Right
+      theContext.beginPath();
+      theContext.ellipse(rcentx,fcenty,fact,fact,0,0,2*PI);
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(rcentx,rcenty,fact,Math.abs(fact*Math.sin(incd)),0,0,2*PI); // Equatorial ellipse
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(rcentx,rcenty-c9,k9,Math.abs(k9*Math.sin(incd)),0,0,2*PI); // Mid-latitude ellipses
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(rcentx,rcenty+c9,k9,Math.abs(k9*Math.sin(incd)),0,0,2*PI);
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(rcentx,rcenty-c8,k8,Math.abs(k8*Math.sin(incd)),0,0,2*PI); // High-latitude ellipses
+      theContext.stroke(); theContext.beginPath();
+      theContext.ellipse(rcentx,rcenty+c8,k8,Math.abs(k8*Math.sin(incd)),0,0,2*PI);
+      theContext.stroke();
+
+      theContext.font = "16px Arial";
+      theContext.textAlign = "center";
+      theContext.fillStyle = "black";
+      theContext.fillText("Fixed reference frame", fcentx, 360);
+      theContext.fillText("Rotating reference frame", rcentx, 360);
+    }
+
+    function fireProjectile() {
+      status_value = 1;
+    }
+
+    function stopProjectile() {
+      status_value = 2;
+    }
+
+    function clearProjectile() {
+      status_value = 0;
+      trailContext.clearRect(0, 0, theCanvas.width, theCanvas.height);
+      showView()
+      showLat()
+      showRot()
+      showU()
+      showV()
+    }
+
+    function toggleBulge(button) {
+        switch (button.value) {
+            case "ON ":
+                w2 = 0;
+                button.value = "OFF";
+                break;
+            case "OFF":
+                w2 = w*w;
+                button.value = "ON ";
+                break;
+        }
+    }
+
+    // Slider updates
+    function showView() {
+      if (status_value == 0) {
+       viewReadout.innerHTML = viewSlider.value;
+     }
+    }
+    function showLat() {
+      if (status_value == 0) {
+       latReadout.innerHTML = latSlider.value;
+     }
+    }
+    function showRot() {
+      if (status_value == 0) {
+       rotReadout.innerHTML = rotSlider.value;
+     }
+    }
+    function showU() {
+      if (status_value == 0) {
+       uReadout.innerHTML = uSlider.value;
+     }
+    }
+    function showV() {
+      if (status_value == 0) {
+       vReadout.innerHTML = vSlider.value;
+     }
+    }
+
+  </script>
+
+</body>
+
+</html>
