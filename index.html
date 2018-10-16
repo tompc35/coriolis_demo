@@ -117,6 +117,30 @@
   <p>Adapted from BASIC code in Stommel and Moore, An Introduction to the Coriolis Force,
     Columbia University Press (1989)</p>
 
+  <p>The app above demonstrates the motion of a frictionless particle on a rotating planet. It is based on code in the book Introduction to the Coriolis Force, by oceanographers Henry Stommel and Dennis Moore.</p>
+
+  <p>The sliders can be used to adjust parameters before setting the particle in motion. For example, release a particle with a northward velocity of 3.0 at 60 degrees latitude.
+  How big is the loop? What changes if the same thing is tried at 30 degrees latitude? You can also toggle between a planet that bulges slightly at the equator and a perfectly spherical planet, as described below.</p>
+
+  <p>The blue particle follows the rotation of the globe at the initial latitude. It can be useful as a reference point for the acceleration of the red particle.</p>
+
+  <p>View sets the angle of view. 90 degrees is looking down at the north pole, 0 degrees is looking straight at the equator.</p>
+
+  <p>Latitude sets the initial latitude of the particle, in degrees.</p>
+
+  <p>Rotation sets the rotation rate of the planet.</p>
+
+  <p>U - eastward component of the initial velocity, relative to the rotating Earth.</p>
+
+  <p>V -  northward component of initial velocity.</p>
+
+  <p>Equatorial bulge -  determines whether there is a bulge at the equator (light blue) or not (darker blue).</p>
+
+  <p>Because of its rotation, the Earth is not a perfect sphere; its diameter varies by about 43 km depending on whether you measure along the equator or through the poles. From the perspective of the rotating reference frame, the fact that the surface of the earth is higher at the equator helps to balance the centrifugal force, which points outward away from the axis of rotation. This makes the Coriolis force the primary factor determining the direction of the particle when a bulge is present. The centrifugal force dominates when a bulge is not present.</p>
+
+  <p>To see the importance of this bulge at the equator, try initial velocities U = 0 and V = 0. The particle starts with no motion relative to the surface of the Earth; it is rotating along with the Earth in a fixed reference frame. Try this with and without the bulge. What is the difference between the two cases?</p>
+
+
   <script>
     var theCanvas = document.getElementById("theCanvas");
     var theContext = theCanvas.getContext("2d");
