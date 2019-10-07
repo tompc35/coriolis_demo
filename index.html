@@ -259,6 +259,10 @@
       lad = [0.0, v, 0.0, v];
       lod = [0.0,u/Math.cos(la[0])+w,0.0,u/Math.cos(la[0])];
       w2 = w*w;
+      if (bulgeButton.value == "OFF") {
+        w2 = 0;
+      }
+
 
       speed = Math.sqrt(u*u + v*v);
       lad[1] = v;
